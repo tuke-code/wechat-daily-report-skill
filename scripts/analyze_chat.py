@@ -198,38 +198,110 @@ def analyze(args):
     word_cloud_data = generate_word_cloud_data(text_messages)
 
     # --- Simplified Text Generation for AI ---
-    # Strategies:
-    # 1. Uniform handling if total text messages <= 500: Keep all
-    # 2. If > 500: Apply filters
-    
-    kept_indices = set()
-    total_text_count = len(text_messages)
-    
-    # 保留全部消息（测试模式）
-    kept_indices = set(range(len(text_messages)))
+    # 压缩格式：按时间窗口（5分钟）分组，同窗口消息用 | 分隔放同一行
+    # 分块：压缩后仍超过 MAX_LINES_PER_CHUNK 行则拆分为多个文件
+    TIME_WINDOW_SECONDS = 5 * 60  # 5 分钟
+    MAX_LINES_PER_CHUNK = 1800
+    MAX_LINE_LENGTH = 1600  # 单行上限（Read 工具 2000 字符截断，留余量给长用户名）
 
-    simplified_lines = []
-    
-    # Sort indices
-    sorted_indices = sorted(list(kept_indices))
-    
-    summary_header = f"=== 群名称: {data['meta'].get('name', 'Unknown')} ===\n"
-    summary_header += f"=== 日期: {date_str} ===\n"
-    summary_header += f"=== 消息总数: {total_messages} (显示精简文本) ===\n\n"
-    
-    simplified_lines.append(summary_header)
-    
-    for idx in sorted_indices:
-        if idx >= len(text_messages): continue
-        m = text_messages[idx]
-        dt = datetime.datetime.fromtimestamp(m['timestamp'])
-        time_str = dt.strftime('%H:%M')
-        # 去除 [语音转文字] 前缀
-        content = m['content']
-        if content.startswith('[语音转文字] '):
-            content = content[7:]  # len('[语音转文字] ') = 7
-        line = f"[{time_str}] {get_display_name(m)}: {content}"
-        simplified_lines.append(line)
+    # 按时间窗口分组
+    groups = []
+    current_group = []
+    window_start_ts = None
+
+    for m in text_messages:
+        ts = m['timestamp']
+        if window_start_ts is None:
+            window_start_ts = ts
+            current_group = [m]
+        elif ts - window_start_ts <= TIME_WINDOW_SECONDS:
+            current_group.append(m)
+        else:
+            groups.append(current_group)
+            current_group = [m]
+            window_start_ts = ts
+
+    if current_group:
+        groups.append(current_group)
+
+    # 生成压缩行
+    summary_header = f"=== 群名称: {data['meta'].get('name', 'Unknown')} | 日期: {date_str} | 消息总数: {total_messages} ==="
+    simplified_lines = [summary_header]
+
+    for group in groups:
+        start_dt_g = datetime.datetime.fromtimestamp(group[0]['timestamp'])
+        end_dt_g = datetime.datetime.fromtimestamp(group[-1]['timestamp'])
+        time_range_str = start_dt_g.strftime('%H:%M')
+        if start_dt_g.strftime('%H:%M') != end_dt_g.strftime('%H:%M'):
+            time_range_str += f"~{end_dt_g.strftime('%H:%M')}"
+
+        # 构建消息片段
+        # 1. 去除内容换行  2. 合并连续同一发言人  3. 截断超长单条
+        MAX_CONTENT_LENGTH = 200  # 单条消息内容上限
+        segments = []
+        prev_name = None
+        for m in group:
+            content = m['content']
+            if content.startswith('[语音转文字] '):
+                content = content[7:]
+            content = content.replace('\r', '').replace('\n', ' ').strip()
+            if not content:
+                continue
+            if len(content) > MAX_CONTENT_LENGTH:
+                content = content[:MAX_CONTENT_LENGTH] + '...'
+            name = get_display_name(m)
+            if name == prev_name and segments:
+                # 同一发言人连续消息，用 / 合并到上一条
+                segments[-1] += '/' + content
+            else:
+                segments.append(f"{name}:{content}")
+                prev_name = name
+
+        # 截断合并后过长的片段（同一人连发多条拼接后可能很长）
+        MAX_SEGMENT_LENGTH = 500
+        segments = [s[:MAX_SEGMENT_LENGTH] + '...' if len(s) > MAX_SEGMENT_LENGTH else s for s in segments]
+
+        # 合并为一行，超长则拆分
+        prefix = f"[{time_range_str}] "
+        current_line = prefix
+        for seg in segments:
+            if current_line == prefix:
+                # 当前行为空（仅有前缀），直接追加
+                current_line += seg
+            elif len(current_line) + 3 + len(seg) > MAX_LINE_LENGTH:
+                # 加入此消息会超长，另起一行
+                simplified_lines.append(current_line)
+                current_line = prefix + seg
+            else:
+                current_line += ' | ' + seg
+
+        if current_line != prefix:
+            simplified_lines.append(current_line)
+
+    # 分块逻辑
+    chunk_paths = []
+    if len(simplified_lines) <= MAX_LINES_PER_CHUNK:
+        # 单文件即可
+        with open(args.output_text, 'w', encoding='utf-8') as f:
+            f.write("\n".join(simplified_lines))
+        chunk_paths.append(args.output_text)
+    else:
+        # 拆分为多个 chunk 文件
+        base, ext = os.path.splitext(args.output_text)
+        chunk_idx = 1
+        total_chunks = (len(simplified_lines) + MAX_LINES_PER_CHUNK - 1) // MAX_LINES_PER_CHUNK
+        for i in range(0, len(simplified_lines), MAX_LINES_PER_CHUNK):
+            chunk_lines = simplified_lines[i:i + MAX_LINES_PER_CHUNK]
+            # 非首块添加头信息
+            if i > 0:
+                chunk_lines.insert(0, f"{summary_header} (第{chunk_idx}/{total_chunks}部分)")
+            path = f"{base}_{chunk_idx}{ext}"
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(chunk_lines))
+            chunk_paths.append(path)
+            chunk_idx += 1
+
+    print(f"Simplified text: {len(simplified_lines)} lines -> {len(chunk_paths)} file(s)")
 
     # --- Output ---
     stats = {
@@ -243,18 +315,15 @@ def analyze(args):
         "top_talkers": top_talkers,
         "night_owl": night_owl,
         "word_cloud": word_cloud_data,
-        "raw_text_path": args.output_text
+        "raw_text_paths": chunk_paths
     }
-    
+
     with open(args.output_stats, 'w', encoding='utf-8') as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
-        
-    with open(args.output_text, 'w', encoding='utf-8') as f:
-        f.write("\n".join(simplified_lines))
-        
+
     print(f"Analysis complete.")
     print(f"Stats saved to: {args.output_stats}")
-    print(f"Simplified text saved to: {args.output_text}")
+    print(f"Simplified text saved to: {', '.join(chunk_paths)}")
 
 if __name__ == "__main__":
     args = parse_arguments()

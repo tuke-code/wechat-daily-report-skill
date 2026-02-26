@@ -27,11 +27,14 @@ python scripts/analyze_chat.py <聊天记录.json> --output-stats stats.json --o
 
 **输出**:
 - `stats.json` - 统计数据（话唠榜、熬夜冠军、词云等）
-- `simplified_chat.txt` - 全量聊天文本，供 AI 分析
+- `simplified_chat.txt` - 压缩格式聊天文本，供 AI 分析
+  - 格式：`[时间段] 发言人A:内容 | 发言人B:内容/内容/内容`
+  - `|` 分隔不同发言人，`/` 分隔同一人连续消息
+  - 如消息量大（超过1800行），自动拆分为 `simplified_chat_1.txt`, `simplified_chat_2.txt` 等多个文件
 
 ### 2. AI 生成内容
 
-根据 `simplified_chat.txt` 和 `stats.json`，按 `references/ai_prompt.md` 中的格式生成 AI 内容，保存为 `ai_content.json`。
+根据 `simplified_chat.txt`（或多个分块文件，见 `stats.json` 中的 `raw_text_paths` 字段）和 `stats.json`，按 `references/ai_prompt.md` 中的格式生成 AI 内容，保存为 `ai_content.json`。
 
 AI 需要生成的内容包括：
 - `topics`: 讨论热点（3-5 个）

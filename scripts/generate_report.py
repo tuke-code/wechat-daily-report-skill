@@ -149,14 +149,17 @@ def main():
         
         # 清理临时文件
         if args.clean_temp:
-            # 获取 simplified_chat.txt 路径（从 stats.json 中读取）
-            simplified_text_path = stats.get('raw_text_path')
+            # 获取 simplified_chat.txt 路径（兼容新旧格式）
+            text_paths = stats.get('raw_text_paths', [])
+            if not text_paths:
+                legacy = stats.get('raw_text_path')
+                if legacy:
+                    text_paths = [legacy]
             temp_files = [
                 html_path,           # 临时 HTML
                 args.stats,          # stats.json
                 args.ai_content,     # ai_content.json
-                simplified_text_path # simplified_chat.txt
-            ]
+            ] + text_paths           # simplified_chat 文件（可能多个）
             cleanup_temp_files(temp_files)
     else:
         # 仅生成 HTML
@@ -166,12 +169,15 @@ def main():
         
         # 清理临时文件（HTML 输出时不删除 HTML 本身）
         if args.clean_temp:
-            simplified_text_path = stats.get('raw_text_path')
+            text_paths = stats.get('raw_text_paths', [])
+            if not text_paths:
+                legacy = stats.get('raw_text_path')
+                if legacy:
+                    text_paths = [legacy]
             temp_files = [
-                args.stats,          # stats.json  
+                args.stats,          # stats.json
                 args.ai_content,     # ai_content.json
-                simplified_text_path # simplified_chat.txt
-            ]
+            ] + text_paths           # simplified_chat 文件（可能多个）
             cleanup_temp_files(temp_files)
 
 
