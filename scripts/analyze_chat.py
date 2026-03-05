@@ -40,6 +40,44 @@ def get_display_name(msg):
     return msg.get('groupNickname') or msg.get('accountName') or 'Unknown'
 
 
+def build_avatar_maps(data, messages):
+    members = data.get('members', [])
+
+    # platformId -> avatar，用于 sender 精确映射
+    sender_avatar_map = {}
+    # accountName/groupNickname -> avatar，用于渲染层按名字兜底映射
+    name_avatar_map = {}
+
+    for member in members:
+        sender = member.get('platformId')
+        name = member.get('accountName')
+        avatar = member.get('avatar')
+        if sender and avatar:
+            sender_avatar_map[sender] = avatar
+        if name and avatar and name not in name_avatar_map:
+            name_avatar_map[name] = avatar
+
+    # 补充 groupNickname 名称映射（当群昵称与 accountName 不一致时）
+    for msg in messages:
+        sender = msg.get('sender')
+        display_name = get_display_name(msg)
+        avatar = sender_avatar_map.get(sender)
+        if display_name and avatar and display_name not in name_avatar_map:
+            name_avatar_map[display_name] = avatar
+
+    return sender_avatar_map, name_avatar_map
+
+
+def resolve_avatar_for_name(name, name_sender_counter, sender_avatar_map, fallback_name_avatar_map):
+    counter = name_sender_counter.get(name)
+    if counter:
+        for sender, _ in counter.most_common():
+            avatar = sender_avatar_map.get(sender)
+            if avatar:
+                return avatar
+    return fallback_name_avatar_map.get(name)
+
+
 def is_night_time(hour):
     # 23:00 - 06:00
     return hour >= 23 or hour < 6
@@ -100,7 +138,7 @@ def generate_word_cloud_data(text_messages, top_n=60):
 def analyze(args):
     data = load_chat_records(args.input_file)
     messages = data.get('messages', [])
-    members = {m['platformId']: m['accountName'] for m in data.get('members', [])}
+    sender_avatar_map, name_avatar_map = build_avatar_maps(data, messages)
     
     # Basic Stats
     total_messages = len(messages)
@@ -119,11 +157,17 @@ def analyze(args):
         date_str = start_dt.strftime('%Y-%m-%d')
     else:
         start_time = end_time = "N/A"
+        start_dt = end_dt = datetime.datetime.now()
         date_str = datetime.datetime.now().strftime('%Y-%m-%d')
 
     # --- Talkative List (Top 3) ---
     user_msg_counts = Counter(get_display_name(m) for m in messages)
     top_talkers_tuple = user_msg_counts.most_common(3)
+    name_sender_counter = defaultdict(Counter)
+    for m in messages:
+        sender = m.get('sender')
+        if sender:
+            name_sender_counter[get_display_name(m)][sender] += 1
     
     top_talkers = []
     top_talker_names = set()
@@ -153,6 +197,12 @@ def analyze(args):
             word_counts = Counter(words)
             common_words = [w for w, _ in word_counts.most_common(5)]
         talker["common_words"] = common_words
+        talker["avatar"] = resolve_avatar_for_name(
+            name=name,
+            name_sender_counter=name_sender_counter,
+            sender_avatar_map=sender_avatar_map,
+            fallback_name_avatar_map=name_avatar_map
+        )
 
     # --- Night Owl Champion ---
     # 23:00 - 06:00, Find the user who spoke latest (closest to 06:00 from the left or right?)
@@ -191,7 +241,13 @@ def analyze(args):
             "last_time": champion['time'],
             "msg_count": count,
             "last_msg": champion['content'] if champion['content'] else "[非文本消息]",
-            "title": "深夜守门员" if champion['lateness'] > 300 else "修仙党"
+            "title": "深夜守门员" if champion['lateness'] > 300 else "修仙党",
+            "avatar": resolve_avatar_for_name(
+                name=champ_name,
+                name_sender_counter=name_sender_counter,
+                sender_avatar_map=sender_avatar_map,
+                fallback_name_avatar_map=name_avatar_map
+            )
         }
 
     # --- Word Cloud ---
@@ -307,6 +363,8 @@ def analyze(args):
     stats = {
         "meta": {
             "name": data['meta'].get('name'),
+            "group_avatar": data['meta'].get('groupAvatar'),
+            "source_chat_path": os.path.abspath(args.input_file),
             "date": date_str,
             "total_count": total_messages,
             "active_user_count": len(active_users),

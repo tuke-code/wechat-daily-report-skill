@@ -51,20 +51,67 @@
         }
 
         header {
-            text-align: center;
             margin-bottom: 30px;
+        }
+
+        .header-main {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 18px;
         }
 
         h1 {
             font-size: 26px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .date {
             color: #888;
             font-size: 14px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
+        .avatar {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            background-color: #DDD;
+            color: #FFF;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .avatar-fallback {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .group-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            font-size: 22px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
 
         .meta-dashboard {
@@ -204,6 +251,23 @@
             font-size: 12px;
             color: #999;
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tutorial-person {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .meta-avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 10px;
         }
 
         .tutorial-link {
@@ -241,19 +305,32 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 10px;
+            gap: 10px;
+        }
+
+        .msg-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .msg-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 11px;
         }
 
         .msg-sender {
             font-weight: 600;
             color: var(--wx-link);
             font-size: 14px;
-            margin-left: 8px;
         }
 
         .msg-time {
             color: #999;
             font-size: 12px;
-            margin-left: 8px;
         }
 
         .priority-badge {
@@ -291,16 +368,8 @@
             width: 38px;
             height: 38px;
             border-radius: 4px;
-            background-color: #DDD;
             margin-right: 10px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 14px;
-            color: #FFF;
-            font-weight: bold;
-            text-transform: uppercase;
         }
 
         .wx-msg-content {
@@ -412,6 +481,22 @@
             margin-bottom: 4px;
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .qa-person {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .qa-avatar {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-size: 10px;
         }
 
         .best-badge {
@@ -478,7 +563,7 @@
 
         .rank-item {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             padding: 20px 0;
             border-bottom: 1px solid #F0F0F0;
         }
@@ -504,6 +589,14 @@
             font-size: 14px;
             margin-right: 15px;
             margin-top: 2px;
+        }
+
+        .rank-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-right: 12px;
         }
 
         .rank-1 {
@@ -607,6 +700,15 @@
         .owl-crown {
             font-size: 32px;
             margin-right: 15px;
+        }
+
+        .owl-avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            font-size: 18px;
+            margin-right: 12px;
+            background-color: rgba(255, 255, 255, 0.2);
         }
 
         .owl-name {
@@ -753,12 +855,30 @@
 </head>
 
 <body>
+    {% macro render_avatar(avatar_url, name, class_name, fallback_bg='#DDD') -%}
+    {% set fallback_char = name[0] if name else '?' %}
+    <div class="{{ class_name }}" style="background-color: {{ fallback_bg }};">
+        {% if avatar_url %}
+        <img src="{{ avatar_url }}" alt="{{ name }}头像" referrerpolicy="no-referrer" loading="eager"
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+        <span class="avatar-fallback" style="display:none;">{{ fallback_char }}</span>
+        {% else %}
+        <span class="avatar-fallback">{{ fallback_char }}</span>
+        {% endif %}
+    </div>
+    {%- endmacro %}
+
     <div class="container">
 
         <!-- 头部 -->
         <header>
-            <h1>{{ meta.name }}日报</h1>
-            <div class="date">{{ meta.date }}</div>
+            <div class="header-main">
+                {{ render_avatar(meta.group_avatar, meta.name, 'avatar group-avatar', '#9EC9A9') }}
+                <div class="header-text">
+                    <h1>{{ meta.name }}日报</h1>
+                    <div class="date">{{ meta.date }}</div>
+                </div>
+            </div>
             <div class="meta-dashboard">
                 <div class="meta-item">
                     <span class="meta-val">{{ meta.total_count }}</span>
@@ -810,8 +930,12 @@
                 <span class="tutorial-type">{{ res.type }}</span>
                 <div class="tutorial-title">{{ res.title }}</div>
                 <div class="tutorial-meta">
-                    分享者：<span style="color:var(--wx-link)">{{ res.sharer }}</span> · 时间：{{ res.time }} · 分类：{{
-                    res.category }}
+                    <span class="tutorial-person">
+                        {{ render_avatar(res.avatar, res.sharer, 'avatar meta-avatar') }}
+                        <span style="color:var(--wx-link)">分享者：{{ res.sharer }}</span>
+                    </span>
+                    <span>时间：{{ res.time }}</span>
+                    <span>分类：{{ res.category }}</span>
                 </div>
                 <p style="font-size:14px; color:#333;">{{ res.description }}</p>
                 {% if res.key_points %}
@@ -839,8 +963,9 @@
             {% for msg in ai_content.important_messages %}
             <div class="card">
                 <div class="msg-header">
-                    <div style="display:flex; align-items:center;">
+                    <div class="msg-main">
                         <span class="priority-badge">优先级：{{ msg.priority }}</span>
+                        {{ render_avatar(msg.avatar, msg.sender, 'avatar msg-avatar') }}
                         <span class="msg-sender">{{ msg.sender }}</span>
                         <span class="msg-time">{{ msg.time }}</span>
                     </div>
@@ -872,8 +997,7 @@
                 <div class="wx-chat-wrapper">
                     {% for msg in dialogue.messages %}
                     <div class="wx-msg-row">
-                        <div class="wx-avatar" style="background-color:{{ msg.avatar_color | default('#DDD') }};">{{
-                            msg.name[0] }}</div>
+                        {{ render_avatar(msg.avatar, msg.name, 'avatar wx-avatar', msg.avatar_color | default('#DDD')) }}
                         <div class="wx-msg-content">
                             <div class="wx-name-time">{{ msg.name }} {{ msg.time }}</div>
                             <div class="wx-bubble">{{ msg.content }}</div>
@@ -902,7 +1026,10 @@
                     <div class="qa-icon icon-q">Q</div>
                     <div style="flex-grow:1;">
                         <div class="qa-meta">
-                            <span>{{ qa.questioner }}</span>
+                            <span class="qa-person">
+                                {{ render_avatar(qa.questioner_avatar, qa.questioner, 'avatar qa-avatar') }}
+                                <span>{{ qa.questioner }}</span>
+                            </span>
                             <span>{{ qa.question_time }}</span>
                         </div>
                         <div class="qa-text">{{ qa.question }}</div>
@@ -919,7 +1046,10 @@
                     <div class="qa-icon icon-a">A</div>
                     <div style="flex-grow:1;">
                         <div class="qa-meta">
-                            <span>{{ qa.answerer }}</span>
+                            <span class="qa-person">
+                                {{ render_avatar(qa.answerer_avatar, qa.answerer, 'avatar qa-avatar') }}
+                                <span>{{ qa.answerer }}</span>
+                            </span>
                             <div>
                                 {% if qa.is_best %}<span class="best-badge">最佳回答</span>{% endif %}
                                 <span>{{ qa.answer_time }}</span>
@@ -965,6 +1095,7 @@
                         {% for talker in top_talkers %}
                         <div class="rank-item">
                             <div class="rank-badge rank-{{ talker.rank }}">{{ talker.rank }}</div>
+                            {{ render_avatar(talker.avatar, talker.name, 'avatar rank-avatar') }}
                             <div class="rank-content">
                                 <div class="rank-header">
                                     <span class="rank-name">{{ talker.name }}</span>
@@ -1001,6 +1132,7 @@
                 <div class="owl-card">
                     <div class="owl-header">
                         <div class="owl-crown">👑</div>
+                        {{ render_avatar(night_owl.avatar, night_owl.name, 'avatar owl-avatar', 'rgba(255,255,255,0.2)') }}
                         <div>
                             <span class="owl-name">{{ night_owl.name }}</span>
                             <span class="owl-title">{{ night_owl.title }}</span>

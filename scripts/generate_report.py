@@ -60,6 +60,103 @@ def load_json(file_path):
         return json.load(f)
 
 
+def get_display_name(msg):
+    return msg.get('groupNickname') or msg.get('accountName') or ''
+
+
+def build_name_avatar_map_from_chat(chat_json_path):
+    data = load_json(chat_json_path)
+    if not data:
+        return {}
+
+    members = data.get('members', [])
+    messages = data.get('messages', [])
+
+    sender_avatar_map = {}
+    name_avatar_map = {}
+
+    for member in members:
+        sender = member.get('platformId')
+        name = member.get('accountName')
+        avatar = member.get('avatar')
+        if sender and avatar:
+            sender_avatar_map[sender] = avatar
+        if name and avatar and name not in name_avatar_map:
+            name_avatar_map[name] = avatar
+
+    for msg in messages:
+        sender = msg.get('sender')
+        display_name = get_display_name(msg)
+        avatar = sender_avatar_map.get(sender)
+        if display_name and avatar and display_name not in name_avatar_map:
+            name_avatar_map[display_name] = avatar
+
+    return name_avatar_map
+
+
+def load_name_avatar_map(stats, stats_path):
+    avatar_map = {}
+
+    # 兼容旧版 stats：若已内嵌映射，继续支持
+    legacy_map = stats.get('name_avatar_map', {})
+    if isinstance(legacy_map, dict):
+        avatar_map.update(legacy_map)
+
+    source_chat_path = stats.get('meta', {}).get('source_chat_path')
+    if source_chat_path:
+        if not os.path.isabs(source_chat_path):
+            base_dir = os.path.dirname(os.path.abspath(stats_path))
+            source_chat_path = os.path.normpath(os.path.join(base_dir, source_chat_path))
+        if os.path.exists(source_chat_path):
+            avatar_map.update(build_name_avatar_map_from_chat(source_chat_path))
+
+    return avatar_map
+
+
+def get_name_avatar(name, name_avatar_map):
+    if not isinstance(name, str):
+        return None
+    clean_name = name.strip()
+    if not clean_name:
+        return None
+    return name_avatar_map.get(clean_name)
+
+
+def fill_ai_content_avatars(ai_content, name_avatar_map):
+    # 资源分享：按 sharer 补头像
+    for res in ai_content.get('resources', []):
+        if not res.get('avatar'):
+            avatar = get_name_avatar(res.get('sharer'), name_avatar_map)
+            if avatar:
+                res['avatar'] = avatar
+
+    # 重要消息：按 sender 补头像
+    for msg in ai_content.get('important_messages', []):
+        if not msg.get('avatar'):
+            avatar = get_name_avatar(msg.get('sender'), name_avatar_map)
+            if avatar:
+                msg['avatar'] = avatar
+
+    # 对话：按 name 补头像
+    for dialogue in ai_content.get('dialogues', []):
+        for msg in dialogue.get('messages', []):
+            if not msg.get('avatar'):
+                avatar = get_name_avatar(msg.get('name'), name_avatar_map)
+                if avatar:
+                    msg['avatar'] = avatar
+
+    # 问答：分别补提问者/回答者头像
+    for qa in ai_content.get('qas', []):
+        if not qa.get('questioner_avatar'):
+            avatar = get_name_avatar(qa.get('questioner'), name_avatar_map)
+            if avatar:
+                qa['questioner_avatar'] = avatar
+        if not qa.get('answerer_avatar'):
+            avatar = get_name_avatar(qa.get('answerer'), name_avatar_map)
+            if avatar:
+                qa['answerer_avatar'] = avatar
+
+
 def html_to_image(html_path, output_path):
     """使用 Playwright 将 HTML 转换为长图"""
     try:
@@ -81,6 +178,21 @@ def html_to_image(html_path, output_path):
         
         # 等待页面加载完成
         page.wait_for_load_state('networkidle')
+
+        # 长图截图前先滚动到底再回顶，触发所有区块资源加载（尤其是头像）
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        page.wait_for_timeout(500)
+        page.evaluate("window.scrollTo(0, 0)")
+        page.wait_for_timeout(200)
+
+        # 头像为外链资源，额外等待图片加载/失败回退完成，超时则继续截图
+        try:
+            page.wait_for_function(
+                "() => Array.from(document.images).every(img => img.complete)",
+                timeout=8000
+            )
+        except Exception:
+            pass
         
         # 截取整个页面（长图）
         page.screenshot(path=output_path, full_page=True)
@@ -113,6 +225,7 @@ def main():
     
     # Merge AI-generated traits into top_talkers
     top_talkers = stats.get('top_talkers', [])
+    name_avatar_map = load_name_avatar_map(stats, args.stats)
     talker_profiles = ai_content.get('talker_profiles', {})
     for talker in top_talkers:
         name = talker.get('name')
@@ -120,12 +233,25 @@ def main():
             profile = talker_profiles[name]
             if 'traits' in profile:
                 talker['traits'] = profile['traits']
+        if not talker.get('avatar'):
+            avatar = get_name_avatar(name, name_avatar_map)
+            if avatar:
+                talker['avatar'] = avatar
+
+    night_owl = stats.get('night_owl')
+    if isinstance(night_owl, dict) and not night_owl.get('avatar'):
+        avatar = get_name_avatar(night_owl.get('name'), name_avatar_map)
+        if avatar:
+            night_owl['avatar'] = avatar
+
+    # Fill avatars for AI blocks
+    fill_ai_content_avatars(ai_content, name_avatar_map)
     
     # Prepare template context
     context = {
         'meta': stats.get('meta', {}),
         'top_talkers': top_talkers,
-        'night_owl': stats.get('night_owl'),
+        'night_owl': night_owl,
         'word_cloud': stats.get('word_cloud', []),
         'ai_content': ai_content,
         'generated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
