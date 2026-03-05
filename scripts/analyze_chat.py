@@ -1,4 +1,4 @@
-import json
+﻿import json
 import argparse
 import datetime
 import re
@@ -363,7 +363,6 @@ def analyze(args):
     stats = {
         "meta": {
             "name": data['meta'].get('name'),
-            "group_avatar": data['meta'].get('groupAvatar'),
             "source_chat_path": os.path.abspath(args.input_file),
             "date": date_str,
             "total_count": total_messages,
@@ -386,3 +385,4 @@ def analyze(args):
 if __name__ == "__main__":
     args = parse_arguments()
     analyze(args)
+

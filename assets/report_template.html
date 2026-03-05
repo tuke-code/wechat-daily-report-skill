@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -51,31 +51,20 @@
         }
 
         header {
+            text-align: center;
             margin-bottom: 30px;
-        }
-
-        .header-main {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            margin-bottom: 18px;
         }
 
         h1 {
             font-size: 26px;
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: 8px;
         }
 
         .date {
             color: #888;
             font-size: 14px;
-            margin-bottom: 0;
-        }
-
-        .header-text {
-            text-align: left;
+            margin-bottom: 20px;
         }
 
         .avatar {
@@ -106,13 +95,6 @@
             justify-content: center;
         }
 
-        .group-avatar {
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            font-size: 22px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        }
 
         .meta-dashboard {
             display: grid;
@@ -872,13 +854,8 @@
 
         <!-- 头部 -->
         <header>
-            <div class="header-main">
-                {{ render_avatar(meta.group_avatar, meta.name, 'avatar group-avatar', '#9EC9A9') }}
-                <div class="header-text">
-                    <h1>{{ meta.name }}日报</h1>
-                    <div class="date">{{ meta.date }}</div>
-                </div>
-            </div>
+            <h1>{{ meta.name }}日报</h1>
+            <div class="date">{{ meta.date }}</div>
             <div class="meta-dashboard">
                 <div class="meta-item">
                     <span class="meta-val">{{ meta.total_count }}</span>
@@ -1323,3 +1300,4 @@
 </body>
 
 </html>
+
