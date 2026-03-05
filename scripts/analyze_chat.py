@@ -241,7 +241,7 @@ def analyze(args):
             "last_time": champion['time'],
             "msg_count": count,
             "last_msg": champion['content'] if champion['content'] else "[非文本消息]",
-            "title": "深夜守门员" if champion['lateness'] > 300 else "修仙党",
+            "title": "熬夜冠军",
             "avatar": resolve_avatar_for_name(
                 name=champ_name,
                 name_sender_counter=name_sender_counter,
