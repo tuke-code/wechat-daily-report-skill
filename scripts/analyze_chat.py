@@ -1,11 +1,20 @@
-﻿import json
 import argparse
 import datetime
-import re
 import random
 import os
+import subprocess
 import sys
 from collections import Counter, defaultdict
+
+try:
+    from scripts.wechat_decrypted_reader import DEFAULT_DECRYPTED_DIR, load_chatroom_records
+except ModuleNotFoundError:
+    from wechat_decrypted_reader import DEFAULT_DECRYPTED_DIR, load_chatroom_records
+
+try:
+    from scripts.runtime_paths import ensure_runtime_dirs, get_default_stats_path, get_default_text_path
+except ModuleNotFoundError:
+    from runtime_paths import ensure_runtime_dirs, get_default_stats_path, get_default_text_path
 
 # Try to import jieba, fallback if not available
 try:
@@ -17,16 +26,33 @@ except ImportError:
     print("Warning: 'jieba' module not found. Word cloud will use simple whitespace splitting.")
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Analyze WeChat chat records.')
-    parser.add_argument('input_file', help='Path to the input JSON file')
-    parser.add_argument('--output-stats', default='stats.json', help='Path to output statistics JSON')
-    parser.add_argument('--output-text', default='simplified_chat.txt', help='Path to output simplified text for AI')
+    parser = argparse.ArgumentParser(description='Analyze WeChat chat records from decrypted database.')
+    parser.add_argument('--decrypted-dir', default=str(DEFAULT_DECRYPTED_DIR), help='Path to decrypted WeChat database directory')
+    parser.add_argument('--chatroom', required=True, help='Chatroom display name keyword or chatroom id')
+    parser.add_argument('--date', help='Single day filter, format YYYY-MM-DD or YYYYMMDD')
+    parser.add_argument('--start', help='Start date filter, format YYYY-MM-DD or YYYYMMDD')
+    parser.add_argument('--end', help='End date filter, format YYYY-MM-DD or YYYYMMDD')
+    parser.add_argument('--skip-refresh', action='store_true', help='Skip running decrypt refresh before analysis')
+    parser.add_argument('--output-stats', default=str(get_default_stats_path()), help='Path to output statistics JSON')
+    parser.add_argument('--output-text', default=str(get_default_text_path()), help='Path to output simplified text for AI')
     return parser.parse_args()
 
-def load_chat_records(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    return data
+
+def refresh_decrypted_data(decrypted_dir):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    decrypt_script = os.path.join(script_dir, 'decrypt_wechat.py')
+    result = subprocess.run(
+        [sys.executable, decrypt_script],
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "刷新微信解密数据失败:\n"
+            f"{result.stdout}\n{result.stderr}".strip()
+        )
 
 def format_timestamp(ts):
     dt = datetime.datetime.fromtimestamp(ts)
@@ -84,7 +110,7 @@ def is_night_time(hour):
 
 def generate_word_cloud_data(text_messages, top_n=60):
     words = []
-    stopwords = set(['的', '了', '我', '是', '你', '在', '他', '我们', '好', '去', '都', '就', '那', '有', '这', '也', '要', '吗', '啊', '吧', '呢', '哈', '哈哈', '哈哈哈', '图片', '表情', '动画表情', '语音', '转文字', '语音转文字'])
+    stopwords = set(['的', '了', '我', '是', '你', '在', '他', '我们', '好', '去', '都', '就', '那', '有', '这', '也', '要', '吗', '啊', '吧', '呢', '哈', '哈哈', '哈哈哈', '图片', '表情', '动画表情', '语音', '转文字', '语音转文字', '链接', '分享', '回复', '一条', '一张', '发的', '说'])
     
     # 合并文本时去除 [语音转文字] 前缀
     contents = []
@@ -136,7 +162,17 @@ def generate_word_cloud_data(text_messages, top_n=60):
     return cloud_data
 
 def analyze(args):
-    data = load_chat_records(args.input_file)
+    ensure_runtime_dirs()
+    if not args.skip_refresh:
+        refresh_decrypted_data(args.decrypted_dir)
+
+    data = load_chatroom_records(
+        decrypted_dir=args.decrypted_dir,
+        chatroom_query=args.chatroom,
+        date=args.date,
+        start=args.start,
+        end=args.end,
+    )
     messages = data.get('messages', [])
     sender_avatar_map, name_avatar_map = build_avatar_maps(data, messages)
     
@@ -186,7 +222,7 @@ def analyze(args):
         if name in top_talker_names:
             talker_all_text[name].append(m['content'])
     
-    stopwords = set(['的', '了', '我', '是', '你', '在', '他', '我们', '好', '去', '都', '就', '那', '有', '这', '也', '要', '吗', '啊', '吧', '呢', '哈', '哈哈', '哈哈哈', '图片', '表情', '动画表情', '一个', '这个', '那个', '什么', '怎么', '可以', '就是', '不是', '没有', '还有', '但是', '现在', '知道', '真的', '感觉', '觉得', '可能', '应该', '已经', '还是', '一下'])
+    stopwords = set(['的', '了', '我', '是', '你', '在', '他', '我们', '好', '去', '都', '就', '那', '有', '这', '也', '要', '吗', '啊', '吧', '呢', '哈', '哈哈', '哈哈哈', '图片', '表情', '动画表情', '一个', '这个', '那个', '什么', '怎么', '可以', '就是', '不是', '没有', '还有', '但是', '现在', '知道', '真的', '感觉', '觉得', '可能', '应该', '已经', '还是', '一下', '链接', '分享', '回复', '一条', '一张', '发的', '说'])
     
     for talker in top_talkers:
         name = talker["name"]
@@ -363,7 +399,8 @@ def analyze(args):
     stats = {
         "meta": {
             "name": data['meta'].get('name'),
-            "source_chat_path": os.path.abspath(args.input_file),
+            "source_chat_path": data['meta'].get('decrypted_dir'),
+            "source_chatroom": data['meta'].get('groupId'),
             "date": date_str,
             "total_count": total_messages,
             "active_user_count": len(active_users),
@@ -372,10 +409,12 @@ def analyze(args):
         "top_talkers": top_talkers,
         "night_owl": night_owl,
         "word_cloud": word_cloud_data,
+        "name_avatar_map": name_avatar_map,
         "raw_text_paths": chunk_paths
     }
 
     with open(args.output_stats, 'w', encoding='utf-8') as f:
+        import json
         json.dump(stats, f, ensure_ascii=False, indent=2)
 
     print(f"Analysis complete.")
