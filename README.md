@@ -49,27 +49,11 @@ cd ~/.claude/skills/
 git clone https://github.com/ADVISORYDZ/wechat-daily-report-skill.git
 ```
 
-### 第二步：解密并选择群聊
-
-本项目现在直接读取 `wechat-decrypt` 解密后的原始 SQLite 数据库，不再使用 ChatLab JSON 中间格式。
-这些数据库默认位于当前项目下。
-
-执行下面这条本地链路：
-
-```bash
-python scripts/setup_check.py --ensure-decryptor
-python scripts/decrypt_wechat.py
-python scripts/list_wechat_groups.py
-```
-
-> 解密方式完全走本地 `wechat-decrypt`，不会调用第三方聊天导出 API。
-> `analyze_chat.py` 在默认情况下会在分析前再次执行一次解密刷新，确保读取的是最新聊天记录；只有传 `--skip-refresh` 时才跳过。
-
-### 第三步：基本使用
+### 第二步：基本使用
 
 在 Claude Code 中直接对 Claude 下达指令：
 
-> **“基于本机解密后的微信数据库，生成 [群名称] 今日日报”**
+> **“生成 [群名称] 今日日报”**
 
 Claude 将自动调用本项目中的脚本，从解密后的原始数据库读取指定群聊并渲染日报长图。
 
