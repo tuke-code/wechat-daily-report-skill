@@ -8,6 +8,7 @@
 - **AI 智能摘要**: 利用 AI 识别讨论热点、提取有价值的资源/教程、捕捉有趣对话和问答。
 - **可视化报告**: 基于 HTML/CSS 模板渲染，自动生成适配手机屏幕（iPhone 14 Pro Max 分辨率）的日报图片。
 - **风格化**: 支持幽默、玩梗的报告风格，提升阅读乐趣。
+- **本地原始库直连**: 直接读取解密后的微信数据库分析指定群聊，不再需要 ChatLab JSON 中间文件。
 
 ## 🛠️ 依赖环境
 
@@ -20,6 +21,16 @@
 pip install jieba jinja2 playwright
 playwright install chromium
 ```
+
+### 可选：本地微信数据库解密依赖
+
+如果你要直接从本机微信数据库导出群聊，而不是手头已有 ChatLab JSON：
+
+```bash
+python scripts/setup_check.py --ensure-decryptor
+```
+
+这一步会自动把 `wechat-decrypt` 安装到当前项目下的 `vendor/`，并安装其运行依赖。
 
 ## 🚀 使用流程
 
@@ -38,53 +49,52 @@ cd ~/.claude/skills/
 git clone https://github.com/ADVISORYDZ/wechat-daily-report-skill.git
 ```
 
-### 第二步：获取聊天记录
+### 第二步：解密并选择群聊
 
-使用 [WeFlow](https://github.com/hicccc77/WeFlow) 工具导出您想要分析的微信群聊天记录，选择 **ChatLab** 格式导出。
+本项目现在直接读取 `wechat-decrypt` 解密后的原始 SQLite 数据库，不再使用 ChatLab JSON 中间格式。
+这些数据库默认位于当前项目下。
+
+执行下面这条本地链路：
+
+```bash
+python scripts/setup_check.py --ensure-decryptor
+python scripts/decrypt_wechat.py
+python scripts/list_wechat_groups.py
+```
+
+> 解密方式完全走本地 `wechat-decrypt`，不会调用第三方聊天导出 API。
+> `analyze_chat.py` 在默认情况下会在分析前再次执行一次解密刷新，确保读取的是最新聊天记录；只有传 `--skip-refresh` 时才跳过。
 
 ### 第三步：基本使用
 
 在 Claude Code 中直接对 Claude 下达指令：
 
-> **“生成 [群名称] 今日日报”**
+> **“基于本机解密后的微信数据库，生成 [群名称] 今日日报”**
 
-Claude 将自动调用本项目中的脚本，分析聊天记录并渲染出精美的日报长图。
+Claude 将自动调用本项目中的脚本，从解密后的原始数据库读取指定群聊并渲染日报长图。
 
 ---
 
 ## 🛠️ 详细步骤 (内部逻辑)
 
-## 📂 数据格式
+## 📂 数据来源
 
-### 输入聊天记录 JSON 结构
+输入来源是当前项目下 `vendor/wechat-decrypt/decrypted/` 的原始 SQLite 数据库：
 
-```json
-{
-  "meta": {
-    "name": "群名称",
-    "platform": "wechat",
-    "type": "group"
-  },
-  "members": [
-    {"platformId": "wxid_xxxx", "accountName": "用户A"}
-  ],
-  "messages": [
-    {
-      "sender": "wxid_xxxx",
-      "accountName": "用户A",
-      "timestamp": 1700000000,
-      "type": 0,
-      "content": "消息内容"
-    }
-  ]
-}
-```
-*注：目前仅支持分析 `type: 0` (文本消息)。*
+- `contact/contact.db`
+- `message/message_*.db`
+- `session/session.db`
+
+`scripts/analyze_chat.py` 会直接从这些库里读取指定群聊，不再经过 JSON 转换；并且默认会在每次分析前先刷新一次解密快照。
 
 ## 📁 项目结构
 
 - `scripts/`: 核心 Python 脚本
-    - `analyze_chat.py`: 数据清洗与统计
+    - `setup_check.py`: 检查微信解密环境并准备 `wechat-decrypt`
+    - `decrypt_wechat.py`: 解密本机微信数据库
+    - `list_wechat_groups.py`: 列出解密库中的群聊和消息量
+    - `wechat_decrypted_reader.py`: 读取解密后的微信群聊原始数据
+    - `analyze_chat.py`: 直接分析解密后的群聊数据库并生成统计
     - `generate_report.py`: 模板渲染与图片生成
 - `assets/`: 资源文件
     - `report_template.html`: Jinja2 报告模板
