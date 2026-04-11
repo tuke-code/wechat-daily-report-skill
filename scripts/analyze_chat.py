@@ -11,11 +11,6 @@ try:
 except ModuleNotFoundError:
     from wechat_decrypted_reader import DEFAULT_DECRYPTED_DIR, load_chatroom_records
 
-try:
-    from scripts.runtime_paths import ensure_runtime_dirs, get_default_stats_path, get_default_text_path
-except ModuleNotFoundError:
-    from runtime_paths import ensure_runtime_dirs, get_default_stats_path, get_default_text_path
-
 # Try to import jieba, fallback if not available
 try:
     import jieba
@@ -33,8 +28,8 @@ def parse_arguments():
     parser.add_argument('--start', help='Start date filter, format YYYY-MM-DD or YYYYMMDD')
     parser.add_argument('--end', help='End date filter, format YYYY-MM-DD or YYYYMMDD')
     parser.add_argument('--skip-refresh', action='store_true', help='Skip running decrypt refresh before analysis')
-    parser.add_argument('--output-stats', default=str(get_default_stats_path()), help='Path to output statistics JSON')
-    parser.add_argument('--output-text', default=str(get_default_text_path()), help='Path to output simplified text for AI')
+    parser.add_argument('--output-stats', default='stats.json', help='Path to output statistics JSON')
+    parser.add_argument('--output-text', default='simplified_chat.txt', help='Path to output simplified text for AI')
     return parser.parse_args()
 
 
@@ -162,7 +157,6 @@ def generate_word_cloud_data(text_messages, top_n=60):
     return cloud_data
 
 def analyze(args):
-    ensure_runtime_dirs()
     if not args.skip_refresh:
         refresh_decrypted_data(args.decrypted_dir)
 

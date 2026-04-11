@@ -6,11 +6,6 @@ try:
 except ModuleNotFoundError:
     from wechat_decrypted_reader import DEFAULT_DECRYPTED_DIR, list_chatrooms
 
-try:
-    from scripts.runtime_paths import ensure_runtime_dirs
-except ModuleNotFoundError:
-    from runtime_paths import ensure_runtime_dirs
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="列出解密后的微信数据库中的群聊")
@@ -23,7 +18,6 @@ def parse_args():
 
 
 def main():
-    ensure_runtime_dirs()
     args = parse_args()
     groups = list_chatrooms(args.decrypted_dir)
     print(json.dumps(groups, ensure_ascii=False, indent=2))

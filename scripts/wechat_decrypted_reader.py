@@ -7,12 +7,6 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-try:
-    from scripts.runtime_paths import get_decrypted_dir
-except ModuleNotFoundError:
-    from runtime_paths import get_decrypted_dir
-
-
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
@@ -25,7 +19,8 @@ except ImportError:
     HAS_ZSTD = False
 
 
-DEFAULT_DECRYPTED_DIR = get_decrypted_dir()
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DECRYPTED_DIR = REPO_ROOT / "vendor" / "wechat-decrypt" / "decrypted"
 MESSAGE_DB_PATTERN = re.compile(r"message_\d+\.db$")
 
 

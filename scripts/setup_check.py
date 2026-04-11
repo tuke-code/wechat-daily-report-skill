@@ -14,13 +14,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:
-    from scripts.runtime_paths import ensure_runtime_dirs, get_decryptor_dir
-except ModuleNotFoundError:
-    from runtime_paths import ensure_runtime_dirs, get_decryptor_dir
-
-
-DEFAULT_DECRYPTOR_DIR = get_decryptor_dir()
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DECRYPTOR_DIR = REPO_ROOT / "vendor" / "wechat-decrypt"
 DECRYPTOR_REPO = "https://github.com/ylytdeng/wechat-decrypt"
 DEPENDENCIES = ("pycryptodome", "zstandard")
 SUPPORTED_PLATFORMS = {"win32": "Windows", "darwin": "macOS"}
@@ -148,7 +143,6 @@ def main():
         sys.exit(1)
 
     try:
-        ensure_runtime_dirs()
         if args.ensure_decryptor:
             if not decryptor_dir.exists():
                 report["actions"].append(ensure_decryptor(decryptor_dir))

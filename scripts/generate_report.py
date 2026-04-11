@@ -25,11 +25,6 @@ except ImportError:
     print("Error: 'jinja2' module not found. Please install it with: pip install jinja2")
     sys.exit(1)
 
-try:
-    from scripts.runtime_paths import ensure_runtime_dirs, get_default_report_path
-except ModuleNotFoundError:
-    from runtime_paths import ensure_runtime_dirs, get_default_report_path
-
 
 # iPhone 14 Pro Max 视口尺寸
 VIEWPORT_WIDTH = 430
@@ -42,7 +37,7 @@ def parse_arguments():
     parser.add_argument('--stats', required=True, help='Path to statistics JSON from analyze_chat.py')
     parser.add_argument('--ai-content', required=False, default=None, help='Path to AI-generated content JSON (optional)')
     parser.add_argument('--template', default=None, help='Path to Jinja2 HTML template')
-    parser.add_argument('--output', default=str(get_default_report_path()), help='Output file path (.html or .png/.jpg)')
+    parser.add_argument('--output', default='report.png', help='Output file path (.html or .png/.jpg)')
     parser.add_argument('--clean-temp', action='store_true', help='Delete temporary files after report generation')
     return parser.parse_args()
 
@@ -209,7 +204,6 @@ def html_to_image(html_path, output_path):
 
 def main():
     args = parse_arguments()
-    ensure_runtime_dirs()
     
     # Load data
     stats = load_json(args.stats)

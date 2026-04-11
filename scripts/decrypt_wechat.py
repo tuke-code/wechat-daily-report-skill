@@ -11,13 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:
-    from scripts.runtime_paths import ensure_runtime_dirs, get_decryptor_dir
-except ModuleNotFoundError:
-    from runtime_paths import ensure_runtime_dirs, get_decryptor_dir
-
-
-DECRYPTOR_DIR = get_decryptor_dir()
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DECRYPTOR_DIR = REPO_ROOT / "vendor" / "wechat-decrypt"
 MACOS_SCANNER = DECRYPTOR_DIR / "find_all_keys_macos"
 MACOS_SCANNER_SOURCE = DECRYPTOR_DIR / "find_all_keys_macos.c"
 KEYS_FILE = DECRYPTOR_DIR / "all_keys.json"
@@ -87,7 +82,6 @@ def run_default_flow():
 
 
 def main():
-    ensure_runtime_dirs()
     ensure_decryptor_exists()
     system_name = platform.system().lower()
 
