@@ -141,13 +141,22 @@ def normalize_local_type(local_type):
     return local_type & 0xFFFFFFFF if local_type > 0xFFFFFFFF else local_type
 
 
-def parse_date_string(value):
-    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+def parse_datetime_string(value):
+    """解析日期或日期时间字符串"""
+    formats = (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+        "%Y%m%d %H:%M:%S",
+        "%Y%m%d %H:%M",
+        "%Y%m%d",
+    )
+    for fmt in formats:
         try:
-            return datetime.datetime.strptime(value, fmt).date()
+            return datetime.datetime.strptime(value, fmt)
         except ValueError:
             continue
-    raise ValueError(f"无效日期格式: {value}，请使用 YYYY-MM-DD 或 YYYYMMDD")
+    raise ValueError(f"无效日期时间格式: {value}，请使用 YYYY-MM-DD [HH:MM:SS]")
 
 
 def build_timestamp_range(date=None, start=None, end=None):
@@ -155,19 +164,23 @@ def build_timestamp_range(date=None, start=None, end=None):
         raise ValueError("--date 不能与 --start / --end 同时使用")
 
     if date:
-        target_date = parse_date_string(date)
-        start_dt = datetime.datetime.combine(target_date, datetime.time.min)
+        # 如果是单日模式，默认从该日 00:00:00 到 23:59:59
+        target_dt = parse_datetime_string(date)
+        start_dt = datetime.datetime.combine(target_dt.date(), datetime.time.min)
         end_dt = start_dt + datetime.timedelta(days=1)
         return int(start_dt.timestamp()), int(end_dt.timestamp())
 
     start_ts = None
     end_ts = None
     if start:
-        start_date = parse_date_string(start)
-        start_ts = int(datetime.datetime.combine(start_date, datetime.time.min).timestamp())
+        start_dt = parse_datetime_string(start)
+        start_ts = int(start_dt.timestamp())
     if end:
-        end_date = parse_date_string(end)
-        end_ts = int((datetime.datetime.combine(end_date, datetime.time.min) + datetime.timedelta(days=1)).timestamp())
+        end_dt = parse_datetime_string(end)
+        # 如果 end 只有日期部分（00:00:00），且输入字符串长度较短，则视作包含该日全天
+        if len(end) <= 10 and end_dt.time() == datetime.time.min:
+            end_dt = datetime.datetime.combine(end_dt.date(), datetime.time.min) + datetime.timedelta(days=1)
+        end_ts = int(end_dt.timestamp())
     return start_ts, end_ts
 
 
