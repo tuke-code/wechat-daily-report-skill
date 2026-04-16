@@ -24,9 +24,9 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Analyze WeChat chat records from decrypted database.')
     parser.add_argument('--decrypted-dir', default=str(DEFAULT_DECRYPTED_DIR), help='Path to decrypted WeChat database directory')
     parser.add_argument('--chatroom', required=True, help='Chatroom display name keyword or chatroom id')
-    parser.add_argument('--date', help='Single day filter, format YYYY-MM-DD or YYYYMMDD')
-    parser.add_argument('--start', help='Start date filter, format YYYY-MM-DD or YYYYMMDD')
-    parser.add_argument('--end', help='End date filter, format YYYY-MM-DD or YYYYMMDD')
+    parser.add_argument('--date', help='Single day filter, format YYYY-MM-DD')
+    parser.add_argument('--start', help='Start time filter, format YYYY-MM-DD HH:MM:SS')
+    parser.add_argument('--end', help='End time filter, format YYYY-MM-DD HH:MM:SS')
     parser.add_argument('--skip-refresh', action='store_true', help='Skip running decrypt refresh before analysis')
     parser.add_argument('--output-stats', default='stats.json', help='Path to output statistics JSON')
     parser.add_argument('--output-text', default='simplified_chat.txt', help='Path to output simplified text for AI')
@@ -414,6 +414,10 @@ def analyze(args):
     print(f"Analysis complete.")
     print(f"Stats saved to: {args.output_stats}")
     print(f"Simplified text saved to: {', '.join(chunk_paths)}")
+    
+    # 打印 AI 指令参考，帮助 AI 识别话痨
+    names = [t['name'] for t in top_talkers]
+    print(f"\n[AI 指令参考] 请根据 stats.json 为以下前 3 名话痨生成画像特点：{names}")
 
 if __name__ == "__main__":
     args = parse_arguments()
