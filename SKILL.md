@@ -1,6 +1,6 @@
 ---
 name: wechat-daily-report
-description: 基于本机已登录微信的本地数据库生成微信群聊日报长图。用于用户要求“生成某个微信群的今日日报/昨日报/群聊总结长图/聊天日报图片”这类任务时。流程包含：检查并刷新本地微信解密数据、选择群聊、分析消息、生成 AI 内容、输出手机端 PNG 长图。
+description: 基于本机已登录微信的本地数据库生成微信群聊日报长图。用于用户要求“生成某个微信群的今日日报/昨日报/群聊总结长图/聊天日报图片”这类任务时。如果用户要求“疯狂星期四”版本，可以使用指定的 KFC 模板。流程包含：检查并刷新本地微信解密数据、选择群聊、分析消息、生成 AI 内容、输出手机端 PNG 长图。
 ---
 
 # 微信群聊日报生成 Skill
@@ -56,10 +56,16 @@ python scripts/analyze_chat.py --chatroom "<群名或 chatroom id>" --date 2026-
 
 ### 6. 渲染最终长图
 
-只有在 `ai_content.json` 已生成后，才能执行：
+只有在 `ai_content.json` 已生成后，才能执行。在执行此步骤前，请先判断所需的模板风格：
+- **普通版本**：默认情况使用。
+- **疯狂星期四版本**：如果今天恰好是星期四，或者用户在指令中明确要求了“疯狂星期四”、“肯德基”、“海报风格”等，则**必须**附加 `--template assets/report_template_kfc.html` 参数。
 
 ```bash
+# 默认普通版本
 python scripts/generate_report.py --stats stats.json --ai-content ai_content.json --output report.png --clean-temp
+
+# 疯狂星期四海报特别版
+python scripts/generate_report.py --stats stats.json --ai-content ai_content.json --template assets/report_template_kfc.html --output report.png --clean-temp
 ```
 
 最终产物：
